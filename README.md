@@ -2,7 +2,7 @@
 Open Source tool to manage TipToi by Ravensburger®
 
 ## Features
-- [ ] List files on TipToi
+- [x] List files on TipToi
 - [ ] Search files by name
 - [ ] Search files by ISBN
 - [ ] Firmware update

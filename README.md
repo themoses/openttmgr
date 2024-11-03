@@ -3,7 +3,7 @@ Open Source tool to manage TipToi by Ravensburger®
 
 ## Features
 - [x] List files on TipToi
-- [ ] Search files by name
+- [x] Search files by name
 - [ ] Search files by ISBN
 - [ ] Firmware update
 
@@ -13,9 +13,9 @@ Ravensburger offers an official application in order to manage the files of the 
 ### API search
 Taken from the dev console, the API is able to return queries as json which can be then parsed by `jq
 ```bash
-curl --silent 'https://service.ravensburger.de/@api/deki/site/query?dream.out.format=json&origin=mt-web&limit=10&offset=0&q=feuerwehr&sortBy=-rank&aggpath=&classifications=&includeaggs=true&namespaces=main&pathancestors=&recommendedids=&tags=&types=wiki&notrack=false&parser=bestguess' | jq .
+curl --silent 'https://service.ravensburger.de/@api/deki/site/query?dream.out.format=json&q=feuerwehr&type=books&sortBy=-rank&parser=bestguess' | jq -r .result[].title
 # jq select link and regex to dl link
-curl --silent 'https://service.ravensburger.de/tiptoi%C2%AE/tiptoi%C2%AE_Audiodateien/Audiodateien_tiptoi%C2%AE_B%C3%BCcher/tiptoi%C2%AE_Mein_gro%C3%9Fer_Weltatlas_32911' | grep --only-matching --perl-regexp "(\"https:\/\/ravensburger\.cloud\/rvwebsite\/rvDE\/db\/applications\/[[:alnum:]].*\.gme\")" | cut -d " " -f1
+curl --silent 'https://service.ravensburger.de/tiptoi%C2%AE/tiptoi%C2%AE_Audiodateien/Audiodateien_tiptoi%C2%AE_B%C3%BCcher/tiptoi%C2%AE_Mein_gro%C3%9Fer_Weltatlas_32911' | grep --only-matching --perl-regexp "(\"https:\/\/ravensburger\.cloud\/rvwebsite\/rvDE\/db\/applications\/[[:alnum:]].*\.gme\")" | cut -d " " -f1 | xargs wget
 ```
 
 

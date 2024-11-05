@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+if [[ "$DEBUG" != "" ]]; then
+    set -x
+fi
 set -eo pipefail
 
 MOUNT_POINT=""
@@ -57,31 +60,43 @@ download_tiptoi_file() {
     wget -P "$DOWNLOAD_PATH" "$_gme_file"
 }
 
+lookup_by_ean() {
+    eval _ean="$1"
+    _result_html="https://www.ravensburger.de/de-DE/suche?query=$_ean&productCategories=Ravensburger"
+    #TODO: grep/sed with regex and match 2nd group: (<div class="card-product-name">[[:cntrl:]][[:blank:]].*)(tiptoi®[[:blank:]][[:alnum:]].*[[:blank:]].*)([[:cntrl:]][[:blank:]].*<\/div>)
+
+}
+
 lookup_tiptoi_title() {
+    # takes article number, ISBN or product name
     eval _query="$1"
+    # url encode all whitespaces
+    _query_encoded=$(echo "$_query"|jq -sRr @uri)
 
     # build a new json with title and uri
-    _result_json=$(curl --silent "https://service.ravensburger.de/@api/deki/site/query?dream.out.format=json&q=$_query&types=wiki&sortBy=-rank&parser=bestguess"\
+    #TODO: dont fail if result is empty
+    _result_json=$(curl --silent "https://service.ravensburger.de/@api/deki/site/query?dream.out.format=json&q=$_query_encoded&types=wiki&sortBy=-rank&parser=bestguess"\
      | jq '.result[] as $books | select($books.preview | contains("Audiodatei")) | { title: $books.title, uri: $books.uri }' )
 
     #echo "$_result_json"; exit 0
     mapfile -t _result < <( echo "$_result_json" | jq -r '.title' )
 
     # create selection menu out of results and download selected file
-    select book in "${_result[@]}"; do
-        _product_number=$(echo "$book" | grep --only-matching --perl-regexp "[0-9]{5}" | head -1) #only select first match if there are multiple ids per product
-        _selected_uri=$(echo "$_result_json" | jq -r 'select(.title | contains("'"$_product_number"'")) | .uri')
-        download_tiptoi_file "$_selected_uri"
-    break
-    done
-
+    if [[ ${#_result[@]} != 0 ]]; then
+        select book in "${_result[@]}"; do
+            _product_number=$(echo "$book" | grep --only-matching --perl-regexp "[0-9]{5}" | head -1) #only select first match if there are multiple ids per product
+            _selected_uri=$(echo "$_result_json" | jq -r 'select(.title | contains("'"$_product_number"'")) | .uri')
+            download_tiptoi_file "$_selected_uri"
+            #break
+        done
+    fi
 }
 
 main(){
     check_connectivity
     check_mount
     list_local_tiptoi_files
-    lookup_tiptoi_title feuerwehr
+    lookup_tiptoi_title "\"asdf\""
 }
 
 main

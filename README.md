@@ -1,8 +1,8 @@
 # openttmgr
-Open Source tool to manage TipToi by Ravensburger®
+Open Source tool to manage tiptoi® by Ravensburger®
 
 ## Features
-- [x] List files on TipToi
+- [x] List files on tiptoi®
 - [x] Find files by name
 - [x] Find files by ISBN
 - [x] Find files by Article Number
@@ -10,14 +10,20 @@ Open Source tool to manage TipToi by Ravensburger®
 - [ ] Firmware update
 
 ## Idea
-Ravensburger offers an official application in order to manage the files of the tiptoi products. Unfortunately, there is no Linux support, so this tool aims to fill that gap.
+Ravensburger offers an official application in order to manage the files of the tiptoi® products. Unfortunately, there is no Linux support, so this tool aims to fill that gap. It takes a word and uses the search to find matching tiptoi® products. The respective GME file can then be automatically downloaded to the tiptoi®.
 
-### API search
-Taken from the dev console, the API is able to return queries as json which can be then parsed by `jq
+## Dependencies
+- `bash`
+- `jq`
+- `curl`
+- `wget`
+
+## How to
+
+Download the script from here or clone the repository. Run the script and pass the search query as a __*quoted string*___
+
 ```bash
-curl --silent 'https://service.ravensburger.de/@api/deki/site/query?dream.out.format=json&q=feuerwehr&type=books&sortBy=-rank&parser=bestguess' | jq -r .result[].title
-# jq select link and regex to dl link
-curl --silent 'https://service.ravensburger.de/tiptoi%C2%AE/tiptoi%C2%AE_Audiodateien/Audiodateien_tiptoi%C2%AE_B%C3%BCcher/tiptoi%C2%AE_Mein_gro%C3%9Fer_Weltatlas_32911' | grep --only-matching --perl-regexp "(\"https:\/\/ravensburger\.cloud\/rvwebsite\/rvDE\/db\/applications\/[[:alnum:]].*\.gme\")" | cut -d " " -f1 | xargs wget
+./openttmgr.sh "feuerwehr"
 ```
 
 

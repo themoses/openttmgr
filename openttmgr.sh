@@ -48,7 +48,7 @@ list_local_tiptoi_files() {
 }
 
 move_downloaded_files_to_tiptoi() {
-    if [[ "$MOUNT_POINT" != "" && "$DOWNLOAD_PATH" != "" ]]; then
+    if [[ "$MOUNT_POINT" != "" ]] && [[ "$DOWNLOAD_PATH" != "" ]]; then
       find "$DOWNLOAD_PATH" -iname "*.gme" -exec mv {} "$MOUNT_POINT" \;
     fi
 }
@@ -64,6 +64,8 @@ download_tiptoi_file() {
     for _file in "${_gme_files[@]}"; do
         wget -P "$DOWNLOAD_PATH" "$_file"
     done
+    check_connectivity
+    check_mount
     move_downloaded_files_to_tiptoi 
 }
 
@@ -84,7 +86,6 @@ lookup_tiptoi_title() {
     _result_json=$(curl --silent "https://service.ravensburger.de/@api/deki/site/query?dream.out.format=json&q=$_query_encoded&types=wiki&sortBy=-rank&parser=bestguess"\
      | jq '.result[] as $books | select($books.page.path | contains("Audiodateien")) | { title: $books.title, uri: $books.uri }' ) || true # don't fail if result is empty
 
-    #echo "$_result_json"; exit 0
     mapfile -t _result < <( echo "$_result_json" | jq -r '.title' )
 
     # create selection menu out of results and download selected file

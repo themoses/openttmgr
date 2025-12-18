@@ -9,17 +9,19 @@ from rich.progress import Progress
 from furl import furl
 from typing import List
 from pathlib import Path
+from urllib.parse import unquote
 import subprocess
+import shutil
 import logging
 import requests
+import json
 import re
-import tempfile
 import os
 
 # Global stuff like logger and console
 FORMAT = "%(message)s"
 logging.basicConfig(
-    level="DEBUG", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+    level="INFO", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
 )
 logger = logging.getLogger("rich")
 console = Console()
@@ -69,11 +71,18 @@ class Tiptoi:
     local_files: List[Gme] = list()
     # default in Ubuntu 24.04
     mount_dir = f"/media/{os.environ.get('USER')}/tiptoi"
+    # debug with fake mount point
+    # mount_dir = "/tmp/tiptoi"
 
     def __init__(self):
         self.update_state()
 
     def update_state(self):
+        # debug with fake mount point
+        # self.state = self.states[2]
+        # self.state_message = self.state_message[2]
+        # return 0
+
         usb_devices_connected = subprocess.check_output("lsusb")
 
         with open("/proc/mounts", "r") as f:
@@ -142,32 +151,43 @@ class TiptoiManager:
             self.lookup_gme_metadata(gme)
             logger.debug(gme)
         return result_list
-    
+
     def download_gme_file(self, to_download: Gme) -> Path:
         # Get size of the file to download
         request_size = requests.head(to_download.uri.url)
-        to_download.size = int(request_size.headers['content-length'])
+        to_download.size = int(request_size.headers["content-length"])
         logger.debug("Download size: %s", to_download.size)
-        
-        target_dir = Path(f"/home/{ os.environ.get('USER') }/.cache/tiptoi")
+
+        # create a .cache dir for gme files
+        target_dir = Path(f"/home/{os.environ.get('USER')}/.cache/tiptoi")
         Path.mkdir(target_dir, exist_ok=True)
-        filename = Path(to_download.uri.url.split("/")[-1])
+        filename = unquote(Path(to_download.uri.url.split("/")[-1]).name)
         complete_path = Path(f"{target_dir}/{filename}")
 
         logger.debug("Downloading to %s", complete_path)
 
+        # download the file in chunks and update the progress bar
         if not complete_path.exists():
             with Progress() as progress:
                 task = progress.add_task("Downloading", total=to_download.size)
                 while not progress.finished:
                     with requests.get(to_download.uri.url, stream=True) as download:
                         download.raise_for_status()
-                        with open(complete_path, 'wb') as file:
+                        with open(complete_path, "wb") as file:
                             for chunk in download.iter_content(chunk_size=4096):
                                 file.write(chunk)
                                 progress.update(task, advance=4096)
-        
+
         return complete_path
+
+    def copy_to_tiptoi(self, path_to_file: Path) -> bool:
+        if self.tt.state == "MOUNTED":
+            logger.info("Copying %s to tiptoi", path_to_file)
+            shutil.copy2(path_to_file, self.tt.mount_dir)
+            return True
+        else:
+            logger.error("Tiptoi is in state %s - unable to copy data", self.tt.state)
+            return False
 
 
 @click.group()
@@ -190,13 +210,14 @@ def find(title) -> None:
     result = ttmgr.find_gme_files(title)
 
     selection_title = questionary.rawselect(
-    "Select file to download:",
-    choices=[x.title for x in result],
-).ask()
+        "Select file to download:",
+        choices=[x.title for x in result],
+    ).ask()
     selection = [x for x in result if x.title == selection_title]
     logger.debug(selection)
 
-    ttmgr.download_gme_file(selection[0])
+    path_on_disk = ttmgr.download_gme_file(selection[0])
+    ttmgr.copy_to_tiptoi(path_on_disk)
 
 
 @click.command("list")

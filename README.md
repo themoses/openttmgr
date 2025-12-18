@@ -21,17 +21,27 @@ Ravensburger offers an official application in order to manage the files of the 
 - `wget`
 
 ### For python
-- `pip3`
-- `click`
+
+Install all python dependencies with
+
+```bash
+python3 -m venv openttmgr
+# or use uv venv openttmgr
+source openttmgr/bin/activate
+pip3 install -r requirements.txt
+# or use uv pip install -r requirements.txt
+```
 
 ## How to
 
-Download the script from here or clone the repository. Run the script and pass the search query as a __*quoted string*__
+Download the script from here or clone the repository. Run the script and pass the search query as a _*quoted string*_
 
 ```bash
 ./openttmgr.sh "feuerwehr"
 
-./openttgr.py --title feuerwehr
+./openttmgr.py status
+./openttmgr.py list
+./openttmgr.py find feuerwehr
 ```
 
 

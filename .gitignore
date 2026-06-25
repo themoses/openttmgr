@@ -2,3 +2,5 @@ __pycache__
 pyvenv.cfg
 python/openttmgr/bin
 python/openttmgr/lib/
+venv
+.ruff-cache

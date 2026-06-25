@@ -198,7 +198,17 @@ class TiptoiManager:
         if self.tt.state == "MOUNTED":
             for path_to_file in paths_to_copy:
                 logger.info("Copying %s to tiptoi", path_to_file)
-                shutil.copy2(path_to_file, self.tt.mount_dir)
+                size = path_to_file.stat().st_size
+                destination = Path(self.tt.mount_dir) / path_to_file.name
+
+                with Progress() as progress:
+                    task = progress.add_task(f"Copying {path_to_file.name}", total=size)
+                    with open(path_to_file, "rb") as src, open(destination, "wb") as dst:
+                        while chunk := src.read(4096):
+                            dst.write(chunk)
+                            progress.update(task, advance=len(chunk))
+
+                shutil.copystat(path_to_file, destination)
             return True
         else:
             logger.error("Tiptoi is in state %s - unable to copy data", self.tt.state)

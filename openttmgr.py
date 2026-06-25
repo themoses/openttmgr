@@ -37,6 +37,8 @@ class Gme:
         self.title = title
         self.size = size
         self.image: furl = None
+        # a product page can list multiple GME files, one per revision
+        self.download_uris: List[furl] = []
 
     def __str__(self):
         if self.uri is None:
@@ -45,10 +47,13 @@ class Gme:
         if self.image is None:
             self.image = ""
 
+        revisions = "\n        ".join(str(uri) for uri in self.download_uris)
+
         return f"""
         title: {self.title}
         uri: {self.uri}
         image: {self.image}
+        revisions: {revisions}
         size: {round(self.size / 1000 / 1000, 2)} MB
         """
 
@@ -126,11 +131,15 @@ class TiptoiManager:
         """
 
         gme_soup = BeautifulSoup(requests.get(gme.uri.url).text, "html.parser")
-        logger.debug(gme_soup.find("a", {"class": "link-https"}))
         gme.image = furl(gme_soup.find("img", {"class": "internal"}).get("src"))
         logger.debug(gme.image)
-        gme.uri = furl(gme_soup.find("a", {"class": "link-https"}).get("href"))
-        logger.debug(gme.uri)
+
+        gme.download_uris = [
+            furl(link.get("href"))
+            for link in gme_soup.find_all("a", {"class": "link-https"})
+            if link.get("href", "").endswith(".gme")
+        ]
+        logger.debug(gme.download_uris)
 
     def find_gme_files(self, search_term: str) -> List[Gme]:
         result_list: List[Gme] = []
@@ -152,38 +161,44 @@ class TiptoiManager:
             logger.debug(gme)
         return result_list
 
-    def download_gme_file(self, to_download: Gme) -> Path:
-        # Get size of the file to download
-        request_size = requests.head(to_download.uri.url)
-        to_download.size = int(request_size.headers["content-length"])
-        logger.debug("Download size: %s", to_download.size)
-
+    def download_gme_file(self, to_download: Gme) -> List[Path]:
         # create a .cache dir for gme files
         target_dir = Path(f"/home/{os.environ.get('USER')}/.cache/tiptoi")
         Path.mkdir(target_dir, exist_ok=True)
-        filename = unquote(Path(to_download.uri.url.split("/")[-1]).name)
-        complete_path = Path(f"{target_dir}/{filename}")
 
-        logger.debug("Downloading to %s", complete_path)
+        downloaded_paths: List[Path] = []
+        for uri in to_download.download_uris:
+            # Get size of the file to download
+            request_size = requests.head(uri.url)
+            size = int(request_size.headers["content-length"])
+            logger.debug("Download size: %s", size)
 
-        # download the file in chunks and update the progress bar
-        if not complete_path.exists():
-            with Progress() as progress:
-                task = progress.add_task("Downloading", total=to_download.size)
-                while not progress.finished:
-                    with requests.get(to_download.uri.url, stream=True) as download:
-                        download.raise_for_status()
-                        with open(complete_path, "wb") as file:
-                            for chunk in download.iter_content(chunk_size=4096):
-                                file.write(chunk)
-                                progress.update(task, advance=4096)
+            filename = unquote(Path(uri.url.split("/")[-1]).name)
+            complete_path = Path(f"{target_dir}/{filename}")
 
-        return complete_path
+            logger.debug("Downloading to %s", complete_path)
 
-    def copy_to_tiptoi(self, path_to_file: Path) -> bool:
+            # download the file in chunks and update the progress bar
+            if not complete_path.exists():
+                with Progress() as progress:
+                    task = progress.add_task(f"Downloading {filename}", total=size)
+                    while not progress.finished:
+                        with requests.get(uri.url, stream=True) as download:
+                            download.raise_for_status()
+                            with open(complete_path, "wb") as file:
+                                for chunk in download.iter_content(chunk_size=4096):
+                                    file.write(chunk)
+                                    progress.update(task, advance=4096)
+
+            downloaded_paths.append(complete_path)
+
+        return downloaded_paths
+
+    def copy_to_tiptoi(self, paths_to_copy: List[Path]) -> bool:
         if self.tt.state == "MOUNTED":
-            logger.info("Copying %s to tiptoi", path_to_file)
-            shutil.copy2(path_to_file, self.tt.mount_dir)
+            for path_to_file in paths_to_copy:
+                logger.info("Copying %s to tiptoi", path_to_file)
+                shutil.copy2(path_to_file, self.tt.mount_dir)
             return True
         else:
             logger.error("Tiptoi is in state %s - unable to copy data", self.tt.state)
@@ -216,8 +231,8 @@ def find(title) -> None:
     selection = [x for x in result if x.title == selection_title]
     logger.debug(selection)
 
-    path_on_disk = ttmgr.download_gme_file(selection[0])
-    ttmgr.copy_to_tiptoi(path_on_disk)
+    paths_on_disk = ttmgr.download_gme_file(selection[0])
+    ttmgr.copy_to_tiptoi(paths_on_disk)
 
 
 @click.command("list")
